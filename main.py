@@ -5,11 +5,20 @@ from tkinter import filedialog
 from tkinter import messagebox
 import tksheet,ttk
 import pandas as pd
-
+import mysql.connector
+import pymysql
+# ==========================
+import cv2
+import pytesseract
+import os
+from pyzbar.pyzbar import decode
+# ==========================
 import cv2
 import numpy as np
 from sys import exit
 from db_connect import *
+
+pytesseract.pytesseract.tesseract_cmd = 'A:/New folder/tesseract.exe'
 # ##################################################################################################################################################################################
 # ##################################################################################################################################################################################
 '''Utility function for redirection and destroying the login screen'''
@@ -31,6 +40,29 @@ class template_selection():
     file = ''
     countER = 0 
     selectFlag = True
+    rowLength = 0
+    dataFrameCounter = 0
+    invalidEntry = 0
+    # =====================================
+    # important params
+    # -------------------------------------
+    answerBookletX1 = 0
+    answerBookletX2 = 0
+    answerBookletY1 = 0
+    answerBookletY2 = 0
+
+    barcodeX1 = 0
+    barcodeX2 = 0
+    barcodeY1 = 0
+    barcodeY2 = 0
+
+    omrX1 = 0
+    omrX2 = 0
+    omrY1 = 0
+    omrY2 = 0
+
+    barcode_count_var = 0
+    # =====================================
     def __init__(self,root):
         self.root = root
         self.root.title('Answer Sheet Evaluation Management')
@@ -56,9 +88,12 @@ class template_selection():
         frame_1.place(x=650,y=15,width=520,height=670)
 
         frame_2 = Frame(self.root,bg='#002e63')
+        frame_3 = Frame(frame_2,bg='#002e63',highlightbackground="blue", highlightthickness=2)
+        
+
         # frame_2.place(x=650,y=15,width=120,height=170)
         # title_1 = Label(frame_1,text="choose a template image",font=('Century Gothic',15),fg="#A8A8A8",bg="white").place(x=200,y=350)
-        canvas = Canvas(frame_1, width = 520, height = 670)      
+        canvas = Canvas(frame_1, width = 520, height = 670,highlightbackground="blue", highlightthickness=2)      
         canvas.pack() 
         canvas.create_text(270,390,fill="#A8A8A8",font=('Century Gothic',15),text="choose a template image")
         # ##################################################################################
@@ -194,9 +229,44 @@ class template_selection():
 
             # verify all parameters
             def verify():
+                cls = self.__class__
                 barcodeCou = barcodeCount.get()
 
-                cls = self.__class__
+                cls.answerBookletX1 = self.booklet_x1.get()
+                cls.answerBookletX2 = self.booklet_x2.get()
+                cls.answerBookletY1 = self.booklet_y1.get()
+                cls.answerBookletY2 = self.booklet_y2.get()
+
+                cls.barcodeX1 = self.barcode_x1.get()
+                cls.barcodeX2 = self.barcode_x2.get()
+                cls.barcodeY1 = self.barcode_y1.get()
+                cls.barcodeY2 = self.barcode_y2.get()
+
+                cls.omrX1 = self.omr_x1.get()
+                cls.omrX2 = self.omr_x2.get()
+                cls.omrY1 = self.omr_y1.get()
+                cls.omrY2 = self.omr_y2.get()
+
+                cls.barcode_count_var = barcodeCou
+                print('cls.answerBookletX1 >>>> ',cls.answerBookletX1)
+                print('cls.answerBookletX2 >>>> ',cls.answerBookletX2)
+                print('cls.answerBookletY1 >>>> ',cls.answerBookletY1)
+                print('cls.answerBookletY2 >>>> ',cls.answerBookletY2)
+
+                print('cls.barcodeX1 >>>> ',cls.barcodeX1)
+                print('cls.barcodeX2 >>>> ',cls.barcodeX2)
+                print('cls.barcodeY1 >>>> ',cls.barcodeY1)
+                print('cls.barcodeY2 >>>> ',cls.barcodeY2)
+
+                print('cls.omrX1 >>>> ',cls.omrX1)
+                print('cls.omrX2 >>>> ',cls.omrX2)
+                print('cls.omrY1 >>>> ',cls.omrY1)
+                print('cls.omrY2 >>>> ',cls.omrY2)
+
+                print('cls.barcode_count_var >>>> ',cls.barcode_count_var)
+
+
+
                 if(cls.counter < 2):
                     messagebox.showerror('Error','Choose all parameter area to proceed.',parent=self.root)
                 elif(barcodeCou == ''):
@@ -253,247 +323,403 @@ class template_selection():
                     def connectDB():
                         disconnected_status.config(text = ' Connecting ...')
                         disconnected_status.config(fg = 'grey')
-                        db_obj = connect()
-                        print('db_obj >>> ',db_obj)
-                        if(db_obj == 'success'):
-                            # on success
+                        try:
+                            # ----------------------------------------------------------------------------------------------------------------------
+                            # DATABASE HANDLER and connections
+                            # ----------------------------------------------------------------------------------------------------------------------
+                            my_db = mysql.connector.connect(host='localhost',user='root',password="",db="university_db")
+                            my_cursor = my_db.cursor()
+                            # my_cursor.execute('show databases')
+
+                            # for i in my_cursor:
+                            #     print(i)
+                            # cur = db.cursor()
+
+                            # fetch records
+                            my_cursor.execute("SELECT * FROM answer_sheet_table_01")
+                            # for row in my_cursor.fetchall():
+                            #     print(row)
+
+                            # my_cursor.close()
+                            # ----------------------------------------------------------------------------------------------------------------------
+                            # ----------------------------------------------------------------------------------------------------------------------
+
                             disconnected_status.config(text = ' Connected')
                             disconnected_status.config(fg = '#00FF00')
+
+                            database_name.config(text = 'Database Name : university_db')
+                            database_name.config(fg = 'white')
+
+
+                            table_name.config(text = 'Table Name : answer_sheet_table_01')
+                            table_name.config(fg = 'white')
+
+                            entryStatus = Label(frame_2,text="",font=('Century Gothic',11,'bold'),fg="white",bg="#002e63")
+                            entryStatus.pack()
+                            entryStatus.place(x=20,y=280)
+
+                            viewDbRecords = Button(frame_2,text="View Records",command=lambda : show_widgets(entryStatus),font=('Century Gothic',9,'bold'),fg="white",bg="#808080")
+                            viewDbRecords.pack()
+                            viewDbRecords.place(x=30,y=190,width=200,height=35)
+
                             
 
-                        else:
-                            # on failed
+                        except:
+                            message = 'fail'
                             disconnected_status.config(text = ' Connection Failed')
                             disconnected_status.config(fg = 'red')
 
 
 
-                            database_name.config(text = 'Database Name : abc xyz database')
-                            database_name.config(fg = '#00FF00')
-
-                            table_name.config(text = 'Table Name : xxxxxxxxxx table')
-                            table_name.config(fg = '#00FF00')
+                            database_name.config(text = 'Database Name : ')
+                            database_name.config(fg = 'white')
 
 
-                            choose_excel_file = Button(frame_2,text="Choose Excel file",command=lambda : show_widgets(),font=('Century Gothic',9,'bold'),fg="white",bg="#808080")
-                            choose_excel_file.pack()
-                            choose_excel_file.place(x=30,y=190,width=200,height=35)
+                            table_name.config(text = 'Table Name : ')
+                            table_name.config(fg = 'white')
 
-
-                            # entry_btn = Button(frame_2,text="Start Entry",command=lambda : show_widgets(),font=('Century Gothic',9,'bold'),fg="white",bg="#808080")
-                            # entry_btn.pack()
-                            # entry_btn.place(x=30,y=190,width=200,height=35)
-
-                            # edit_btn = Button(frame_2,text="Edit Invalid Entries",command=lambda : out_of_scope(),font=('Century Gothic',9,'bold'),fg="white",bg="#808080")
-                            # edit_btn.pack()
-                            # edit_btn.place(x=270,y=190,width=200,height=35)
-
-                            
-
-                            # view_btn = Button(frame_2,text="View Entries",command=lambda : out_of_scope(),font=('Century Gothic',9,'bold'),fg="white",bg="#808080")
-                            # view_btn.pack()
-                            # view_btn.place(x=510,y=190,width=200,height=35)
-
-                        
-                        # =======================================================================================================================
-                        # =======================================================================================================================
                     # =======================================================================================================================
                     # START DB ENTRY AND VIEW RECORDS AND OTHER WIDGETS
                     # =======================================================================================================================
                     def clear_treeview():
                         tree.delete(*tree.get_children())
 
-                    # frame_3 = Frame(self.root,bg='white')
-                    # frame_3.place(x=15,y=320,width=1165,height=350)
-                    # Create a Treeview widget
                     tree = ttk.Treeview(frame_2)
+
+                    # ----------------------------------------------------------------------------------------------------------------------
+                    # ----------------------------------------------------------------------------------------------------------------------
                     def selectItem(a):
                         curItem = tree.focus()
                         print(tree.item(curItem))
                         cls.selectFlag = False
+                        fileName = tree.item(curItem)['values'][1]
+                        answeBookletNo = tree.item(curItem)['values'][2]
+                        barcodeNo = tree.item(curItem)['values'][3]
+                        rollNo = tree.item(curItem)['values'][4]
 
-                    def getRecordVal():
-                        if(cls.selectFlag == True):
-                            messagebox.showerror('Error','Select record where to start entry from the below list.')
+                        self.updateFileName.config(text = f'File Name : {fileName}')
+
+                        if(answeBookletNo != '-'):
+                            self.bookletData.delete(0,"end")
+                            self.bookletData.insert(0, str(answeBookletNo))
                         else:
-                            print('Success')
+                            self.bookletData.delete(0,"end")
 
-                    def show_widgets():
-                        # dataLabel = Label(frame_2, text='')
-                        # dataLabel.place(x=30,y=230)
-                        # dataLabel.pack(pady=20)
-
-                        filename = filedialog.askopenfilename(title="Open a File", filetype=(("xlxs files", ".*xlsx"),("All Files", "*.")))
-                        if filename:
-                            cls.selectFlag = True
-                            # try:
-                            filename = r"{}".format(filename)
-                            df = pd.read_excel(filename)
-                            # except ValueError:
-                                # dataLabel.config(text="File could not be opened")
-                            # except FileNotFoundError:
-                                # dataLabel.config(text="File Not Found")
+                        if(barcodeNo != '-'):
+                            self.barcodeData.delete(0,"end")
+                            self.barcodeData.insert(0, str(barcodeNo))
                         else:
-                            cls.selectFlag = True
-                    # Clear all the previous data in tree
+                            self.barcodeData.delete(0,"end")
+
+                        if(rollNo != '-'):
+                            self.rollData.delete(0,"end")
+                            self.rollData.insert(0, str(rollNo))
+                        else:
+                            self.rollData.delete(0,"end")
+
+                    # ----------------------------------------------------------------------------------------------------------------------
+                    # ----------------------------------------------------------------------------------------------------------------------
+                    def stopFunc():
+                        print('process stopped!')
+
+                    # ----------------------------------------------------------------------------------------------------------------------
+                    # Make one method to decode the barcode
+                    def BarcodeReader(image):
+                        data = ''
+                        img = cv2.imread(image)
+                        detectedBarcodes = decode(img)
+                        
+                        if not detectedBarcodes:
+                            print("Barcode Not Detected or your barcode is blank/corrupted!")
+                        else:
+                            for barcode in detectedBarcodes:
+                                (x, y, w, h) = barcode.rect
+                                cv2.rectangle(img, (x-10, y-10),
+                                            (x + w+10, y + h+10),
+                                            (255, 0, 0), 2)
+                                
+                                if barcode.data!="":
+                                    # print(barcode.data)
+                                    # print(barcode.type)
+                                    data = data + str(barcode.data.decode("utf-8")) + "|"
+                                    
+                        #Display the image
+                        # cv2.imshow("Image", img)
+                        # cv2.waitKey(0)
+                        # cv2.destroyAllWindows()
+                        return data
+
+
+                    def updateFunc(dataFrameCounter,index,df,entryStatus,processedRecordsLabel,InvalidRecordsLabel):
+                        entryStatus.config(text = 'Status : Inserting records in table ...')
+                        for i in range(10):
+                            pass
+                        try:
+                            dbcon = mysql.connector.connect(host='localhost',user='root',password="",db="university_db")
+                            my_cursor = dbcon.cursor()
+                            if(dataFrameCounter <= 0 ):
+                                print('Task Finished!')
+                                entryStatus.config(text = '')
+                                entryStatus.config(text = 'Status : Finished')
+                            else:
+                                print('Doing Task!')
+                                # entryStatus.config(text = '')
+                                # ------------------------------------------------------------------------------
+                                # fetch answer booklet number from images
+                                # ------------------------------------------------------------------------------
+                                img_path = f'C:/Users/amitk/Desktop/University-answer-booklet-eval-dash/New folder/Test data/{df[index]}'
+                                img = cv2.imread(img_path)
+                                height, width = img.shape[0:2]
+
+                                startRow = int(height * 0.10)
+                                startCol = int(width * 0.10)
+                                endRow = int(height * 0.90)
+                                endCol = int(width * 0.40)
+
+                                # cropped_image = img[41:123, 191:203]
+                                cropped_image = img[int(cls.answerBookletX1)+20:int(cls.answerBookletY1)+20, int(cls.answerBookletX2)+20:int(cls.answerBookletY2)+20]
+
+                                text = pytesseract.image_to_string(cropped_image)
+                                print('text >>> ',text)
+
+                                data = [int(s) for s in text.split() if s.isdigit() and len(s)>=6]
+
+                                y = BarcodeReader(img_path)
+                                str_list = list(filter(None, y.split('|')))
+
+                                print('str_list >>> ',str_list)
+                                answerBookletNumber = ''
+                                barcodeNumber = ''
+
+                                if(len(str_list) > 1):
+                                    answerBookletNumber = str(str_list[1])
+                                    barcodeNumber = str(str_list[0])
+                                    # ------------------------------------------------------------------------------
+                                    print('answerBookletNumber >>> ',answerBookletNumber)
+                                    # ------------------------------------------------------------------------------
+                                    sql = f"UPDATE answer_sheet_table_01 SET Answer_Booklet_No = {str(answerBookletNumber)},Barcode_No = {str(barcodeNumber)} WHERE File = '{str(df[index])}'"
+                                    my_cursor.execute(sql)
+                                    # print("affected rows = {}".format(my_cursor.rowcount))
+                                    # ========================================================================================
+                                    # ========================================================================================
+                                    processedRecordsLabel.config(text = '')
+                                    processedRecordsLabel.config(text = f'Processed Records : {index+1}')
+                                    InvalidRecordsLabel.config(text = '')
+                                    InvalidRecordsLabel.config(text = f'Invalid Records : {cls.invalidEntry}')
+                                elif(len(str_list) == 1):
+                                    barcodeNumber = str(str_list[0])
+                                    # ------------------------------------------------------------------------------
+                                    print('answerBookletNumber >>> ',answerBookletNumber)
+                                    # ------------------------------------------------------------------------------
+                                    sql = f"UPDATE answer_sheet_table_01 SET Answer_Booklet_No = '-',Barcode_No = {str(barcodeNumber)} WHERE File = '{str(df[index])}'"
+                                    my_cursor.execute(sql)
+                                    # print("affected rows = {}".format(my_cursor.rowcount))
+                                    # ========================================================================================
+                                    cls.invalidEntry = cls.invalidEntry + 1
+                                    # ========================================================================================
+                                    processedRecordsLabel.config(text = '')
+                                    processedRecordsLabel.config(text = f'Processed Records : {index+1}')
+                                    InvalidRecordsLabel.config(text = '')
+                                    InvalidRecordsLabel.config(text = f'Invalid Records : {cls.invalidEntry}')
+                                else:
+                                    # ------------------------------------------------------------------------------
+                                    print('answerBookletNumber >>> ',answerBookletNumber)
+                                    # ------------------------------------------------------------------------------
+                                    sql = f"UPDATE answer_sheet_table_01 SET Answer_Booklet_No = '-',Barcode_No = '-' WHERE File = '{str(df[index])}'"
+                                    my_cursor.execute(sql)
+                                    # print("affected rows = {}".format(my_cursor.rowcount))
+                                    # ========================================================================================
+                                    cls.invalidEntry = cls.invalidEntry + 1
+                                    # ========================================================================================
+                                    processedRecordsLabel.config(text = '')
+                                    processedRecordsLabel.config(text = f'Processed Records : {index+1}')
+                                    InvalidRecordsLabel.config(text = '')
+                                    InvalidRecordsLabel.config(text = f'Invalid Records : {cls.invalidEntry}')
+                                    # try:
+                                    #     if(len(data) == 1):
+                                    #         answerBookletNumber = str(data[0])
+                                    #     elif(len(data) == 0):
+                                    #         answerBookletNumber = '-'
+                                    #     else:
+                                    #         answerBookletNumber = '-'
+                                    # except:
+                                        # answerBookletNumber = str('-')
+
+
+
+                                # ========================================================================================
+                                # ========================================================================================
+                                dbcon.commit()
+                                updateFunc(dataFrameCounter -1,index+1,df,entryStatus,processedRecordsLabel,InvalidRecordsLabel)
+                        except:
+                            disconnected_status.config(text = ' Connection Failed')
+                            disconnected_status.config(fg = 'red')
+
+                            database_name.config(text = 'Database Name : ')
+                            database_name.config(fg = 'white')
+
+                            table_name.config(text = 'Table Name : ')
+                            table_name.config(fg = 'white')
+                            messagebox.showerror('Error','Database connection lost')
+                    # ----------------------------------------------------------------------------------------------------------------------
+                    def getRecordVal(df,entryStatus):
+                        print('Success')
+                        # cls.dataFrameCounter = 0
+                        cls.index = 0
+                        cls.invalidEntry = 0
+                        # entryStatus = Label(frame_2,text="Status : Inserting records in table ...",font=('Century Gothic',11,'bold'),fg="white",bg="#002e63")
+                        # entryStatus.pack()
+                        # entryStatus.place(x=20,y=280)
+
+                        
+                        totalRecordsLabel = Label(frame_2,text="Total Records : "+str(cls.rowLength),font=('Century Gothic',8,'bold'),fg="yellow",bg="#002e63")
+                        totalRecordsLabel.pack()
+                        totalRecordsLabel.place(x=30,y=250)
+
+                        processedRecordsLabel = Label(frame_2,text="Processed Records : 0",font=('Century Gothic',8,'bold'),fg="#00FF00",bg="#002e63")
+                        processedRecordsLabel.pack()
+                        processedRecordsLabel.place(x=200,y=250)
+
+                        InvalidRecordsLabel = Label(frame_2,text="Invalid Records : 0",font=('Century Gothic',8,'bold'),fg="red",bg="#002e63")
+                        InvalidRecordsLabel.pack()
+                        InvalidRecordsLabel.place(x=390,y=250)
+
+                        entryStatus.config(text = 'Status : Records fetched from table')
+                        updateFunc(cls.dataFrameCounter,cls.index,df,entryStatus,processedRecordsLabel,InvalidRecordsLabel)
+                    # ----------------------------------------------------------------------------------------------------------------------
+                    def update_selected_record():
+                        dbcon = mysql.connector.connect(host='localhost',user='root',password="",db="university_db")
+                        my_cursor = dbcon.cursor()
+                        # ========================================================
+                        # PARAMS
+                        # ========================================================
+                        file_name = self.updateFileName.cget("text").split(':')
+                        answerBook_no = self.bookletData.get()
+                        bar_no = self.barcodeData.get()
+                        roll_no = self.rollData.get()
+                        # ========================================================
+                        if(answerBook_no == ''):
+                            answerBook_no = '-'
+                        if(bar_no == ''):
+                            bar_no = '-'
+                        if(roll_no == ''):
+                            roll_no = '-'
+                        # ========================================================
+                        print('file_name >>>> ',file_name)
+                        print('answerBook_no >>>> ',answerBook_no)
+                        print('bar_no >>>> ',bar_no)
+                        print('roll_no >>>> ',roll_no)
+                        if(len(file_name) > 1):
+                            sql = f"UPDATE answer_sheet_table_01 SET Answer_Booklet_No = '{answerBook_no}',Barcode_No = '{str(bar_no)}',Roll_No='{str(roll_no)}' WHERE File = '{str(file_name[1].strip())}'"
+                            my_cursor.execute(sql)
+                            dbcon.commit()
+                            messagebox.showinfo('Success','Record updated successfullyy.')
+                            # ----------------------------------------------------------------------------------
+                            clear_treeview()
+                            # Add new data in Treeview widget
+                            tree["column"]=['File Path', 'File Name','Answer Booklet No','Barcode No','Roll No']
+                            tree["show"] = "headings"
+
+                            # For Headings iterate over the columns
+                            for col in tree["column"]:
+                                tree.heading(col, text=col)
+
+                            dbcon = mysql.connector.connect(host='localhost',user='root',password="",db="university_db")
+                            SQL_Query = pd.read_sql_query("select * from answer_sheet_table_01 where Answer_Booklet_No='-' or Barcode_No='-' or Roll_No='-'", dbcon)
+                            df = pd.DataFrame(SQL_Query, columns=['File_Path', 'File','Answer_Booklet_No','Barcode_No','Roll_No'])
+
+                            df_data = df['File']
+
+                            # Put Data in Rows
+                            df_rows = df.to_numpy().tolist()
+                            cls.rowLength = 0
+                            cls.rowLength = cls.rowLength + len(df_rows)
+                            cls.dataFrameCounter = cls.rowLength
+                            for row in df_rows:
+                                tree.insert("", "end", values=row)
+                            tree.bind('<ButtonRelease-1>', selectItem)
+                            tree.pack()
+                            tree.place(x=15,y=320,width=1165,height=350)
+                            # ----------------------------------------------------------------------------------
+                        else:
+                            messagebox.showinfo('Info','Select a record to update.')
+                    # ----------------------------------------------------------------------------------------------------------------------
+                    def show_widgets(entryStatus):
                         clear_treeview()
 
-                    # Add new data in Treeview widget
-                        tree["column"] = list(df.columns)
+                        # Add new data in Treeview widget
+                        tree["column"]=['File Path', 'File Name','Answer Booklet No','Barcode No','Roll No']
                         tree["show"] = "headings"
 
-                    # For Headings iterate over the columns
+                        # For Headings iterate over the columns
                         for col in tree["column"]:
                             tree.heading(col, text=col)
 
-                    # Put Data in Rows
+                        dbcon = mysql.connector.connect(host='localhost',user='root',password="",db="university_db")
+                        SQL_Query = pd.read_sql_query("select * from answer_sheet_table_01 where Answer_Booklet_No='-' or Barcode_No='-' or Roll_No='-'", dbcon)
+                        df = pd.DataFrame(SQL_Query, columns=['File_Path', 'File','Answer_Booklet_No','Barcode_No','Roll_No'])
+
+                        df_data = df['File']
+
+                        # Put Data in Rows
                         df_rows = df.to_numpy().tolist()
+                        cls.rowLength = 0
+                        cls.rowLength = cls.rowLength + len(df_rows)
+                        cls.dataFrameCounter = cls.rowLength
                         for row in df_rows:
                             tree.insert("", "end", values=row)
                         tree.bind('<ButtonRelease-1>', selectItem)
                         tree.pack()
                         tree.place(x=15,y=320,width=1165,height=350)
-
-
-                        selectionRecord = Button(frame_2,text="Start Data Entry",command= lambda : getRecordVal(),font=('Century Gothic',9,'bold'),fg="white",bg="#808080")
+                        # ----------------------------------------------------------------------------------------------------------------------
+                        # entryStatus = Label(frame_2,text="Status : Records Fetched from Table",font=('Century Gothic',11,'bold'),fg="white",bg="#002e63")
+                        # entryStatus.pack()
+                        # entryStatus.place(x=20,y=280)
+                        entryStatus.config(text = 'Status : Record fetched from table')
+                        # ----------------------------------------------------------------------------------------------------------------------
+                        selectionRecord = Button(frame_2,text="Start Data Entry",command= lambda : getRecordVal(df_data,entryStatus),font=('Century Gothic',9,'bold'),fg="white",bg="#808080")
                         selectionRecord.pack()
                         selectionRecord.place(x=270,y=190,width=220,height=35)
-
                         # ----------------------------------------------------------------------------------------------------------------------
-                        # header for table
-                        # border = Canvas(frame_2, width=1170, height=1)
-                        # border.pack()
-                        # border.place(x=10,y=270)
-
-                        # current_record_head_id_info = Label(frame_2,text="ID",font=('Century Gothic',9,'bold'),fg="white",bg="#002e63")
-                        # current_record_head_id_info.pack()
-                        # current_record_head_id_info.place(x=25,y=280)
-
-                        # current_record_head_name_info = Label(frame_2,text="File",font=('Century Gothic',9,'bold'),fg="white",bg="#002e63")
-                        # current_record_head_name_info.pack()
-                        # current_record_head_name_info.place(x=150,y=280)
-
-                        # current_record_head_booklet_info = Label(frame_2,text="Answer Booklet No.",font=('Century Gothic',9,'bold'),fg="white",bg="#002e63")
-                        # current_record_head_booklet_info.pack()
-                        # current_record_head_booklet_info.place(x=430,y=280)
-
-                        # current_record_head_barcode_info = Label(frame_2,text="Barcode No.",font=('Century Gothic',9,'bold'),fg="white",bg="#002e63")
-                        # current_record_head_barcode_info.pack()
-                        # current_record_head_barcode_info.place(x=640,y=280)
-
-                        # current_record_head_roll_info = Label(frame_2,text="Roll No.",font=('Century Gothic',9,'bold'),fg="white",bg="#002e63")
-                        # current_record_head_roll_info.pack()
-                        # current_record_head_roll_info.place(x=840,y=280)
-
-                        # current_record_head_roll_info = Label(frame_2,text="Invalid Flag",font=('Century Gothic',9,'bold'),fg="white",bg="#002e63")
-                        # current_record_head_roll_info.pack()
-                        # current_record_head_roll_info.place(x=990,y=280)
-
-                        # border_1 = Canvas(frame_2, width=1170, height=1)
-                        # border_1.pack()
-                        # border_1.place(x=10,y=310)
                         # ----------------------------------------------------------------------------------------------------------------------
-                        # list out records
-                        # frame_3 = Frame(self.root,bg='white')
-                        # frame_3.place(x=15,y=320,width=1165,height=350)
-                        # scroll_bar = Scrollbar(frame_3)
-                        # scroll_bar.pack( side = RIGHT,fill = Y)
-                        # mylist = Listbox(frame_3, yscrollcommand = scroll_bar.set,width=1165,height=350)
-                        # # mylist.place(x=30,y=500)
-
-                        # import openpyxl
-  
-                        # # # load excel with its path
-                        # wrkbk = openpyxl.load_workbook("db_records.xlsx")
-                        
-                        # sh = wrkbk.active
-                        # # # iterate through excel and display data
-                        # # # countER = 0 
-                        # cls = self.__class__
-                        # try:
-                        #     gotdata = dlist[cls.countER]
-                        #     mylist.insert(0,f"  {line} ----------------------------- {line} ----------------- {line}")
-                        #     cls.countER += 1
-                        # except IndexError:
-                        #     gotdata = 'null'
-
-                            
-                        # def counter_label(current_record_head_id_info):
-                        #     if(cls.counter <= 500):
-                        #         def count():
-                        #             cls.countER += 1
-                        #             # current_record_head_id_info.config(text=str(cls.countER))
-                        #             mylist.insert(0,f"  {cls.countER} ----------------------------- {cls.countER} ----------------- {cls.countER}")
-                            
-                        #             mylist.pack( side = LEFT, fill = BOTH )
-                                
-                        #             scroll_bar.config( command = mylist.yview )
-
-                        #             current_record_head_id_info.after(10, count)
-                        #     else:
-                        #     if(cls.counter == 500):
-                        #         return 'hello'
-                        #     else:
-                        #         count()
-
-
-                        # data = counter_label(current_record_head_id_info)
-                        # print('data >>> ',data)
-                        # for line in range(1, 5000):
-                        #     mylist.insert(0,f"  {line} ----------------------------- {line} ----------------- {line}")
-                        
-                        #     mylist.pack( side = LEFT, fill = BOTH )
-                            
-                        #     scroll_bar.config( command = mylist.yview )
-
-                        # inc_y = 340
-                        # for i in range(15):
-                            # current_record_head_id_info = Label(frame_2,text=str(i),font=('Century Gothic',9,'bold'),fg="white",bg="#002e63")
-                            # current_record_head_id_info.pack()
-                            # current_record_head_id_info.place(x=25,y=inc_y)
-
-                            # current_record_head_name_info = Label(frame_2,text="File"+str(i),font=('Century Gothic',9,'bold'),fg="white",bg="#002e63")
-                            # current_record_head_name_info.pack()
-                            # current_record_head_name_info.place(x=150,y=inc_y)
-
-                            # current_record_head_booklet_info = Label(frame_2,text="Answer Booklet No."+str(i),font=('Century Gothic',9,'bold'),fg="white",bg="#002e63")
-                            # current_record_head_booklet_info.pack()
-                            # current_record_head_booklet_info.place(x=430,y=inc_y)
-
-                            # current_record_head_barcode_info = Label(frame_2,text="Barcode No."+str(i),font=('Century Gothic',9,'bold'),fg="white",bg="#002e63")
-                            # current_record_head_barcode_info.pack()
-                            # current_record_head_barcode_info.place(x=640,y=inc_y)
-
-                            # current_record_head_roll_info = Label(frame_2,text="Roll No."+str(i),font=('Century Gothic',9,'bold'),fg="white",bg="#002e63")
-                            # current_record_head_roll_info.pack()
-                            # current_record_head_roll_info.place(x=840,y=inc_y)
-
-                            # current_record_head_roll_info = Label(frame_2,text="Valid",font=('Century Gothic',9,'bold'),fg="white",bg="#002e63")
-                            # current_record_head_roll_info.pack()
-                            # current_record_head_roll_info.place(x=990,y=inc_y)
-
-                            # inc_y = inc_y + 20
-
-                        # ----------------------------------------------------------------------------------------------------------------------
-                        # current_record = Label(frame_2,text="Current entry",font=('Century Gothic',13,'bold'),fg="white",bg="#002e63")
-                        # current_record.pack()
-                        # current_record.place(x=30,y=310)
-
-                        # current_record_id_info = Label(frame_2,text="-",font=('Century Gothic',11,'bold'),fg="white",bg="#002e63")
-                        # current_record_id_info.pack()
-                        # current_record_id_info.place(x=350,y=310)
-
-                        # current_record_name_info = Label(frame_2,text="-",font=('Century Gothic',11,'bold'),fg="white",bg="#002e63")
-                        # current_record_name_info.pack()
-                        # current_record_name_info.place(x=760,y=310)
-                        # ----------------------------------------------------------------------------------------------------------------------
-                        # ---------------------------------------------------------------------------------------------------------------------
-
                         border_2 = Canvas(frame_2, width=1170, height=1)
                         border_2.pack()
                         border_2.place(x=10,y=680)
+                        
+                        
                         # ----------------------------------------------------------------------------------------------------------------------
-                        # ----------------------------------------------------------------------------------------------------------------------
+                        frame_3.place(x=700,y=45,width=478,height=265)
+                        
+
+                        self.updateLabel = Label(self.root,text="Update Record",font=('Century Gothic',14,'bold'),fg="white",bg="#002e63")
+                        self.updateLabel.pack()
+                        self.updateLabel.place(x=725,y=32)
+
+                        self.updateFileName = Label(self.root,text="File Name : ",font=('Century Gothic',10,'bold'),fg="white",bg="#002e63")
+                        self.updateFileName.pack()
+                        self.updateFileName.place(x=750,y=90)
+
+                        self.update_answer_Booklet = Label(self.root,text="Answer Booklet No : ",font=('Century Gothic',10,'bold'),fg="white",bg="#002e63")
+                        self.update_answer_Booklet.pack()
+                        self.update_answer_Booklet.place(x=750,y=130)
+                        self.bookletData = Entry(self.root,font=('Century Gothic',10),fg="white",bg="#1d1d1d")
+                        self.bookletData.place(x=890,y=130,width=200,height=20)
+
+                        self.update_barcode = Label(self.root,text="Barcode No : ",font=('Century Gothic',10,'bold'),fg="white",bg="#002e63")
+                        self.update_barcode.pack()
+                        self.update_barcode.place(x=750,y=170)
+                        self.barcodeData = Entry(self.root,font=('Century Gothic',10),fg="white",bg="#1d1d1d")
+                        self.barcodeData.place(x=890,y=170,width=200,height=20)
+
+                        self.update_rooll = Label(self.root,text="Roll No : ",font=('Century Gothic',10,'bold'),fg="white",bg="#002e63")
+                        self.update_rooll.pack()
+                        self.update_rooll.place(x=750,y=210)
+                        self.rollData = Entry(self.root,font=('Century Gothic',10),fg="white",bg="#1d1d1d")
+                        self.rollData.place(x=890,y=210,width=200,height=20)
+
+                        self.updateBtn = Button(self.root,text="Update",command= lambda : update_selected_record(),font=('Century Gothic',8,'bold'),fg="white",bg="#808080")
+                        self.updateBtn.pack()
+                        self.updateBtn.place(x=1040,y=255,width=100,height=25)
                         # ----------------------------------------------------------------------------------------------------------------------
 
                     # =======================================================================================================================
@@ -526,13 +752,7 @@ class template_selection():
 
                     table_name = Label(frame_2,text="Table Name : -",font=('Century Gothic',10,'bold'),fg="grey",bg="#002e63")
                     table_name.pack()
-                    table_name.place(x=450,y=110)
-
-                    # canvas = Canvas(frame_2, width=1170, height=1)
-                    # canvas.pack()
-                    # canvas.place(x=10,y=150)
-
-
+                    table_name.place(x=380,y=110)
                     # =======================================================================================================================
                     # =======================================================================================================================
 
@@ -546,9 +766,9 @@ class template_selection():
                 cls = self.__class__
                 if(cls.counter == 2):
                     x1 = event.x
-                    x2 = x1+400
+                    x2 = x1+370
                     y1 = event.y
-                    y2 = y1+200
+                    y2 = y1+190
                     self.omr_x1.delete(0,"end")
                     self.omr_x1.insert(0, str(x1))
                     self.omr_x2.delete(0,"end")
@@ -598,13 +818,8 @@ class template_selection():
             # mouseclick event
             canvas.bind("<Button 1>",printcoords)
 
-            # # Verify & Proceed button
-            # verify_proceed_btn = Button(self.root,text="Verify & Proceed",command=lambda : verify(),font=('Century Gothic',9,'bold'),fg="white",bg="#808080")
-            # verify_proceed_btn.pack()
-            # verify_proceed_btn.place(x=400,y=725,width=200,height=35)
-
         # choose image button
-        choose_image = Button(self.root,text="Select | Change image",font=('Century Gothic',9,'bold'),fg="white",bg="#808080",command=lambda : choose_file(canvas))
+        choose_image = Button(self.root,text="Select image",font=('Century Gothic',9,'bold'),fg="white",bg="#808080",command=lambda : choose_file(canvas))
         choose_image.pack()
         choose_image.place(x=220,y=58,width=180,height=30)
 
